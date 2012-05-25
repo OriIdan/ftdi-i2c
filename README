@@ -1,0 +1,32 @@
+I2C implementation using FTDI FT4232H
+Written by: Ori Idan Helicon technologies (ori@helicontech.co.il)
+
+This software is a free software distributed under GPL version 3.0 or later.
+Refer to COPYING for the full text of the license.
+
+This code contains two command line utilities: i2csend and i2cget.
+The code is implemented using libftdi (free library for FTDI chips)
+
+This version supports only one F4232 chip connected to any USB port of your system. It will search for the first chip and initialize it. It was not tested on a system with more then one F4232 chips.
+
+Compiling:
+
+Before compling the code insure that libftdi development files are installed in your system.
+On a debian based system (debian, Ubuntu, Mint etc.) this is done by the command: sudo apt-get install libftdi-dev
+I did not try it on other deistributions but there should not be any problem.
+
+After extracting the files from the tarball, enter the directory where the files reside and execute make.
+This will compile both i2csend and i2cget.
+
+
+Using:
+In order to send bytes, use the i2csend with the address and bytes to send.
+For example: to send 0x07 0xaa 0x55 to address 0x20 use the command: i2csend 0x20 0x07 0xaa 0x55
+
+In order to read bytes, use the i2cget with the address and number of bytes to read.
+For example: to read 2 bytes from address 0x20 use the command: i2cget 0x20 2
+
+Note that both commands must be run as root.
+
+For consulting and support, contact Ori Idan at ori@helicontech.co.il
+
