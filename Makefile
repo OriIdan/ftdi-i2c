@@ -3,10 +3,10 @@
 ALL: i2csend i2cget
 
 i2csend: i2csend.c
-	gcc -o i2csend i2csend.c -lftdi
+	gcc `pkg-config --cflags libftdi`  -o i2csend  i2csend.c  `pkg-config --libs libftdi`
 
 i2cget: i2cget.c
-	gcc -o i2cget i2cget.c -lftdi
+	gcc `pkg-config --cflags libftdi`  -o i2cget  i2cget.c  `pkg-config --libs libftdi`
 
 
 

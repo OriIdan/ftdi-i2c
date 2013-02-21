@@ -33,6 +33,8 @@ unsigned char InputBuffer[1024];  // Buffer to hold Data unsigned chars to be re
 unsigned int dwClockDivisor = 0x0095; // Value of clock divisor, SCL Frequency = 60/((1+0x0095)*2) (MHz) = 200khz
 unsigned int dwNumBytesToSend = 0; // Index of output buffer
 unsigned int dwNumBytesSent = 0, dwNumBytesRead = 0, dwNumInputBuffer = 0;
+int chan;
+unsigned char gpio;
 int debug = 0;	// Debug mode
 
 /*
@@ -50,9 +52,9 @@ void HighSpeedSetI2CStart(void) {
 		//Command to set directions of lower 8 pins and force value on bits set as output
 		OutputBuffer[dwNumBytesToSend++] = '\x80'; 
 		//Set SDA, SCL high, GPIOL0 low
-		OutputBuffer[dwNumBytesToSend++] = '\x03'; 
+		OutputBuffer[dwNumBytesToSend++] = '\x03' | (gpio << 4); 
 		//Set SK,DO,GPIOL0 pins as output 
-		OutputBuffer[dwNumBytesToSend++] = '\x13';
+		OutputBuffer[dwNumBytesToSend++] = '\xF3';
 	}
 	
 	// Repeat commands to ensure the minimum period of the start setup time ie 600ns is achieved
@@ -60,16 +62,16 @@ void HighSpeedSetI2CStart(void) {
 		//Command to set directions of lower 8 pins and force value on bits set as output
 		OutputBuffer[dwNumBytesToSend++] = '\x80'; 
 		//Set SDA low, SCL high, GPIOL0 low
-		OutputBuffer[dwNumBytesToSend++] = '\x01'; 
+		OutputBuffer[dwNumBytesToSend++] = '\x01' | (gpio << 4); 
 		//Set SK,DO,GPIOL0 pins as output 
-		OutputBuffer[dwNumBytesToSend++] = '\x13'; 
+		OutputBuffer[dwNumBytesToSend++] = '\xF3'; 
 	}
 	//Command to set directions of lower 8 pins and force value on bits set as output
 	OutputBuffer[dwNumBytesToSend++] = '\x80';
 	//Set SDA, SCL low, GPIOL0 low
-	OutputBuffer[dwNumBytesToSend++] = '\x00'; 
+	OutputBuffer[dwNumBytesToSend++] = '\x00' | (gpio << 4); 
 	//Set SK,DO,GPIOL0 pins as output with bit „1‟, other pins as input with bit „0‟
-	OutputBuffer[dwNumBytesToSend++] = '\x13'; 
+	OutputBuffer[dwNumBytesToSend++] = '\xF3'; 
 }
 
 /*
@@ -87,9 +89,9 @@ void HighSpeedSetI2CStop(void) {
 		//Command to set directions of lower 8 pins and force value on bits set as output
 		OutputBuffer[dwNumBytesToSend++] = '\x80';
 		//Set SDA low, SCL high, GPIOL0 low
-		OutputBuffer[dwNumBytesToSend++] = '\x01'; 
+		OutputBuffer[dwNumBytesToSend++] = '\x01' | (gpio << 4); 
 		//Set SK,DO,GPIOL0 pins as output
-		OutputBuffer[dwNumBytesToSend++] = '\x13'; 
+		OutputBuffer[dwNumBytesToSend++] = '\xF3'; 
 	}
 
 	// Repeat commands to ensure the minimum period of the stop hold time ie 600ns is achieved
@@ -97,16 +99,16 @@ void HighSpeedSetI2CStop(void) {
 		//Command to set directions of lower 8 pins and force value on bits set as output
 		OutputBuffer[dwNumBytesToSend++] = '\x80'; 
 		//Set SDA, SCL high, GPIOL0 low
-		OutputBuffer[dwNumBytesToSend++] = '\x03'; 
+		OutputBuffer[dwNumBytesToSend++] = '\x03' | (gpio << 4); 
 		//Set SK,DO,GPIOL0 pins as output
-		OutputBuffer[dwNumBytesToSend++] = '\x13'; 
+		OutputBuffer[dwNumBytesToSend++] = '\xF3'; 
 	}
 
 	//Tristate the SCL, SDA pins
 	//Command to set directions of lower 8 pins and force value on bits set as output
 	OutputBuffer[dwNumBytesToSend++] = '\x80'; 
-	OutputBuffer[dwNumBytesToSend++] = '\x00'; 
-	OutputBuffer[dwNumBytesToSend++] = '\x10'; 
+	OutputBuffer[dwNumBytesToSend++] = '\x00' | (gpio << 4); 
+	OutputBuffer[dwNumBytesToSend++] = '\xF0'; 
 }
 
 /*
@@ -125,9 +127,9 @@ int SendByteAndCheckACK(unsigned char DataSend) {
 	// Get Acknowledge bit
 	// Command to set directions of lower 8 pins and force value on bits set as output
 	OutputBuffer[dwNumBytesToSend++] = '\x80'; 
-	OutputBuffer[dwNumBytesToSend++] = '\x00'; // Set SCL low, 
+	OutputBuffer[dwNumBytesToSend++] = '\x00' | (gpio << 4); // Set SCL low, 
 	//Set SK, GPIOL0 pins as output 
-	OutputBuffer[dwNumBytesToSend++] = '\x11';
+	OutputBuffer[dwNumBytesToSend++] = '\xF1';
 	//Command to scan in ACK bit , -ve clock Edge MSB first
 	OutputBuffer[dwNumBytesToSend++] = MSB_RISING_EDGE_CLOCK_BIT_IN;
 	OutputBuffer[dwNumBytesToSend++] = '\x0';  //Length of 0x0 means to scan in 1 bit
@@ -153,9 +155,9 @@ int SendByteAndCheckACK(unsigned char DataSend) {
 	//Command to set directions of lower 8 pins and force value on bits set as output
 	OutputBuffer[dwNumBytesToSend++] = '\x80'; 
 	// Set SDA high, SCL low
-	OutputBuffer[dwNumBytesToSend++] = '\x02'; 
+	OutputBuffer[dwNumBytesToSend++] = '\x02' | (gpio << 4); 
 	//Set SK,DO,GPIOL0 pins as output
-	OutputBuffer[dwNumBytesToSend++] = '\x13'; 
+	OutputBuffer[dwNumBytesToSend++] = '\xF3'; 
 	return r;
 }
 
@@ -163,7 +165,7 @@ int SendByteAndCheckACK(unsigned char DataSend) {
  | Open FT4232 device and get valid handle for subsequent access.
  | Note that this function initialize the ftdic struct used by other functions.
  */
-int InitializeI2C(void) {
+int InitializeI2C(int chan, unsigned char gpio) {
 	unsigned int dwCount;
 	char SerialNumBuf[64];
 	int bCommandEchoed;
@@ -175,6 +177,9 @@ int InitializeI2C(void) {
 		printf("ftdi init failed\n");
 		return 0;
 	}
+	i = (chan == 0) ? INTERFACE_A : INTERFACE_B;
+	ftdi_set_interface(&ftdic, i);
+	
 	ftStatus = ftdi_usb_open(&ftdic, 0x0403, 0x6011);
 	if(ftStatus < 0) {
 		printf("Error opening usb device: %s\n", ftdi_get_error_string(&ftdic));
@@ -184,6 +189,7 @@ int InitializeI2C(void) {
 	// Port opened successfully
 	if(debug)
 		printf("Port opened, resetting device...\n");
+	
 	ftStatus |= ftdi_usb_reset(&ftdic); 			// Reset USB device
 	ftStatus |= ftdi_usb_purge_rx_buffer(&ftdic);	// purge rx buffer
 	ftStatus |= ftdi_usb_purge_tx_buffer(&ftdic);	// purge tx buffer
@@ -233,8 +239,8 @@ int InitializeI2C(void) {
 	dwNumBytesSent = ftdi_write_data(&ftdic, OutputBuffer, dwNumBytesToSend);	// Send off the commands
 	dwNumBytesToSend = 0;	//Clear output buffer
 	OutputBuffer[dwNumBytesToSend++] = '\x80'; // Command to set directions of lower 8 pins and force value on 	bits set as output
-	OutputBuffer[dwNumBytesToSend++] = '\x03'; // Set SDA, SCL high
-	OutputBuffer[dwNumBytesToSend++] = '\x13'; // Set SK,DO DI as outputs
+	OutputBuffer[dwNumBytesToSend++] = 0x03 | (unsigned char)(gpio << 4) ; // Set SDA, SCL high and set GPIO
+	OutputBuffer[dwNumBytesToSend++] = '\xF3'; // Set SK,DO DI and GPIO as outputs
 	// The SK clock frequency can be worked out by below algorithm with divide by 5 set as off
 	// SK frequency = 60MHz /((1 + [(1 +0xValueH*256) OR 0xValueL])*2)
 	OutputBuffer[dwNumBytesToSend++] = '\x86'; // Command to set clock divisor
@@ -251,20 +257,36 @@ int InitializeI2C(void) {
 }
 
 int main(int argc, char *argv[]) {
-	int i;
-	char *s;
+	int i, a;
+	char *s, *serial;
 	int b = 0;
 
 	if(argc < 2) {
 		printf("i2csend: Send data over i2c bus using ftdi F4232H port 0 I2C\n");
 		printf("Written by: Ori Idan Helicon technologies ltd. (ori@helicontech.co.il)\n\n");
-		printf("usage: i2c <adress> <data>\n");
+		printf("usage: i2c [-c <chan>] [-g <gpio state>] <adress> <data>\n");
 		return 1;
 	}
-
-	InitializeI2C();
+	for(a = 1; a < argc; a++) {
+		s = argv[a];
+		if(*s == '-') {	/* This is a command line option */
+			s++;
+			a++;
+			if(*s == 'c')
+				chan = atoi(argv[a]);
+			else if(*s == 'g')
+				gpio = atoi(argv[a]);
+			else {
+				printf("Unknown option -%c\n", *s);
+				exit;
+			}
+		}
+		else
+			break;
+	}
+	InitializeI2C(chan, gpio);
 	HighSpeedSetI2CStart();
-	s = argv[1];
+	s = argv[a];
 	b = 0;
 	if(*s == '0')
 		s++;
@@ -293,7 +315,7 @@ int main(int argc, char *argv[]) {
 		else
 			printf("Error reading ACK\n");
 	}
-	for(i = 2; i < argc; i++) {
+	for(i = a; i < argc; i++) {
 		/* Acutaly send bytes */
 		s = argv[i];
 		b = 0;
