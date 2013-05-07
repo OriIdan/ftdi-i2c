@@ -196,6 +196,108 @@ unsigned char ReadByte(void) {
 }
 
 /*
+ | ReadBytes:
+ | Read I2C bytes.
+ | Note that read address must be sent beforehand
+ */
+void ReadBytes(char * readBuffer, unsigned int readLength) {
+    unsigned int clock = 60 * 1000/(1+dwClockDivisor)/2; // K Hz
+    const int loopCount = (int)(10 * ((float)200/clock));
+    unsigned int readCount = 0;
+    int i = 0;  // Used only for loop
+    if (!readBuffer || !readLength) {
+        return;
+    }
+    
+    while(readCount != (readLength -1))
+    {
+        // Command of read one byte
+        OutputBuffer[dwNumBytesToSend++] = '\x80'; //Command to set directions of lower 8 pins and force value on bits set as output
+        OutputBuffer[dwNumBytesToSend++] = '\x00'; //Set SCL low, WP disabled by SK, GPIOL0 at bit „‟
+        OutputBuffer[dwNumBytesToSend++] = '\x11'; //Set SK, GPIOL0 pins as output with bit ‟‟, DO and other pins as input with bit „‟
+        OutputBuffer[dwNumBytesToSend++] = MSB_FALLING_EDGE_CLOCK_BYTE_IN; //Command to clock data byte in on –ve Clock Edge MSB first
+        OutputBuffer[dwNumBytesToSend++] = '\x00';
+        OutputBuffer[dwNumBytesToSend++] = '\x00'; //Data length of 0x0000 means 1 byte data to clock in
+        
+        // Set ACK
+        for (i=0; i != loopCount; ++i)
+        {
+            OutputBuffer[dwNumBytesToSend++] = '\x80';
+            OutputBuffer[dwNumBytesToSend++] = '\x00';  // SDA and SCL Low
+            OutputBuffer[dwNumBytesToSend++] = '\x13';
+        }
+
+        for (i=0; i != loopCount; ++i)
+        {
+            OutputBuffer[dwNumBytesToSend++] = '\x80';
+            OutputBuffer[dwNumBytesToSend++] = '\x01';  // SDA Low, SCL High
+            OutputBuffer[dwNumBytesToSend++] = '\x13';
+        }
+
+        for (i=0; i != loopCount; ++i)
+        {
+            OutputBuffer[dwNumBytesToSend++] = '\x80';
+            OutputBuffer[dwNumBytesToSend++] = '\x02';  // SDA High, SCL Low
+            OutputBuffer[dwNumBytesToSend++] = '\x13';
+        }
+        ftStatus = FT_Write(ftHandle, 
+        OutputBuffer, dwNumBytesToSend, &dwNumBytesToSend);
+        dwNumBytesToSend = 0;
+        ++readCount;
+    }
+    
+    // The last byte is read with NO ACK.
+    // Command of read one byte
+    OutputBuffer[dwNumBytesToSend++] = '\x80'; //Command to set directions of lower 8 pins and force value on bits set as output
+    OutputBuffer[dwNumBytesToSend++] = '\x00'; //Set SCL low, WP disabled by SK, GPIOL0 at bit „‟
+    OutputBuffer[dwNumBytesToSend++] = '\x11'; //Set SK, GPIOL0 pins as output with bit ‟‟, DO and other pins as input with bit „‟
+    OutputBuffer[dwNumBytesToSend++] = MSB_FALLING_EDGE_CLOCK_BYTE_IN; //Command to clock data byte in on –ve Clock Edge MSB first
+    OutputBuffer[dwNumBytesToSend++] = '\x00';
+    OutputBuffer[dwNumBytesToSend++] = '\x00'; //Data length of 0x0000 means 1 byte data to clock in
+    
+    // Set NO ACK
+    for (i=0; i != loopCount; ++i)
+    {
+        OutputBuffer[dwNumBytesToSend++] = '\x80';
+        OutputBuffer[dwNumBytesToSend++] = '\x02'; // SDA High SCL Low
+        OutputBuffer[dwNumBytesToSend++] = '\x13';
+    }
+
+    for (i=0; i != loopCount; ++i)
+    {
+        OutputBuffer[dwNumBytesToSend++] = '\x80';
+        OutputBuffer[dwNumBytesToSend++] = '\x03'; // SDA High, SCL High
+        OutputBuffer[dwNumBytesToSend++] = '\x13';
+    }
+
+    for (i=0; i != loopCount; ++i)
+    {
+        OutputBuffer[dwNumBytesToSend++] = '\x80';
+        OutputBuffer[dwNumBytesToSend++] = '\x02'; // SDA High, SCL Low
+        OutputBuffer[dwNumBytesToSend++] = '\x13';
+    }
+    ftStatus = FT_Write(ftHandle, 
+        OutputBuffer, dwNumBytesToSend, &dwNumBytesToSend);
+        dwNumBytesToSend = 0;
+        
+    // Read bytes from device receive buffer, first byte is data read, second byte is ACK bit
+	dwNumBytesRead = ftdi_read_data(&ftdic, readBuffer, readLength);
+    
+    if(dwNumBytesRead != readLength) {
+		printf("Error reading i2c\n");
+		return 0xFF;
+	}
+    
+    if(debug) {
+        for(i=0; i != readLength; ++i) {
+            printf("Data read: %02X\n", readBuffer[i]);
+        }
+    }
+		
+    return;
+}
+
+/*
  | Open FT4232 device and get valid handle for subsequent access.
  | Note that this function initialize the ftdic struct used by other functions.
  */
