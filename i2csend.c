@@ -24,6 +24,8 @@
 /*
  | Globals and constants
  */
+const unsigned short FTDI_DEV_ADDR = 0x6010; // FT4232=0x6011,FT2232=0x6010
+
 const unsigned char MSB_FALLING_EDGE_CLOCK_BYTE_IN = '\x24';
 const unsigned char MSB_FALLING_EDGE_CLOCK_BYTE_OUT = '\x11';
 const unsigned char MSB_RISING_EDGE_CLOCK_BIT_IN = '\x22';
@@ -180,7 +182,7 @@ int InitializeI2C(int chan, unsigned char gpio) {
 	i = (chan == 0) ? INTERFACE_A : INTERFACE_B;
 	ftdi_set_interface(&ftdic, i);
 	
-	ftStatus = ftdi_usb_open(&ftdic, 0x0403, 0x6011);
+	ftStatus = ftdi_usb_open(&ftdic, 0x0403, FTDI_DEV_ADDR);
 	if(ftStatus < 0) {
 		printf("Error opening usb device: %s\n", ftdi_get_error_string(&ftdic));
 		return 1;
