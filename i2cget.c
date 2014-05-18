@@ -178,7 +178,7 @@ unsigned char ReadByte(void) {
 	// Command to clock data byte in on –ve Clock Edge MSB first
 	OutputBuffer[dwNumBytesToSend++] = MSB_FALLING_EDGE_CLOCK_BYTE_IN; 
 	OutputBuffer[dwNumBytesToSend++] = '\x00';
-	OutputBuffer[dwNumBytesToSend++] = '\x00';
+	OutputBuffer[dwNumBytesToSend++] = '\xFF'; // 0xFF=NACK (don't need more data), 0x00=ACK (more data)
 	// Data length of 0x0000 means 1 byte data to clock in
 	// Command to scan in acknowledge bit , -ve clock Edge MSB first
 	OutputBuffer[dwNumBytesToSend++] = MSB_RISING_EDGE_CLOCK_BIT_IN; 
@@ -187,13 +187,13 @@ unsigned char ReadByte(void) {
 	dwNumBytesSent = ftdi_write_data(&ftdic, OutputBuffer, dwNumBytesToSend); // Send off the commands
 	dwNumBytesToSend = 0;	// Clear output buffer
 	// Read two bytes from device receive buffer, first byte is data read, second byte is ACK bit
-	dwNumBytesRead = ftdi_read_data(&ftdic, InputBuffer, 2);
-	if(dwNumBytesRead < 2) {
+	dwNumBytesRead = ftdi_read_data(&ftdic, InputBuffer, 10);
+	if(dwNumBytesRead < 1) {
 		printf("Error reading i2c\n");
 		return 0xFF;
 	}
 	if(debug)
-		printf("Data read: %02X\n", InputBuffer[0]);	
+		printf("Data read (got %d Bytes) 1st: 0x%02X\n", dwNumBytesRead, InputBuffer[0]);
 	return InputBuffer[0];
 }
 
@@ -202,7 +202,6 @@ unsigned char ReadByte(void) {
  | Read I2C bytes.
  | Note that read address must be sent beforehand
  */
-/*
 void ReadBytes(char * readBuffer, unsigned int readLength) {
     unsigned int clock = 60 * 1000/(1+dwClockDivisor)/2; // K Hz
     const int loopCount = (int)(10 * ((float)200/clock));
@@ -243,8 +242,7 @@ void ReadBytes(char * readBuffer, unsigned int readLength) {
             OutputBuffer[dwNumBytesToSend++] = '\x02';  // SDA High, SCL Low
             OutputBuffer[dwNumBytesToSend++] = '\x13';
         }
-        ftStatus = FT_Write(ftHandle, 
-        OutputBuffer, dwNumBytesToSend, &dwNumBytesToSend);
+        dwNumBytesSent = ftdi_write_data(&ftdic, OutputBuffer, dwNumBytesToSend);
         dwNumBytesToSend = 0;
         ++readCount;
     }
@@ -279,27 +277,25 @@ void ReadBytes(char * readBuffer, unsigned int readLength) {
         OutputBuffer[dwNumBytesToSend++] = '\x02'; // SDA High, SCL Low
         OutputBuffer[dwNumBytesToSend++] = '\x13';
     }
-    ftStatus = FT_Write(ftHandle, 
-        OutputBuffer, dwNumBytesToSend, &dwNumBytesToSend);
-        dwNumBytesToSend = 0;
+    dwNumBytesSent = ftdi_write_data(&ftdic, OutputBuffer, dwNumBytesToSend);
+    dwNumBytesToSend = 0;
         
     // Read bytes from device receive buffer, first byte is data read, second byte is ACK bit
 	dwNumBytesRead = ftdi_read_data(&ftdic, readBuffer, readLength);
     
     if(dwNumBytesRead != readLength) {
 		printf("Error reading i2c\n");
-		return 0xFF;
 	}
     
     if(debug) {
+    	printf("Data read (got %d Bytes)\n", dwNumBytesRead);
         for(i=0; i != readLength; ++i) {
-            printf("Data read: %02X\n", readBuffer[i]);
+            printf("Data read: 0x%02X\n", readBuffer[i]);
         }
     }
 		
     return;
 }
-*/
 
 /*
  | Open FT4232 device and get valid handle for subsequent access.
@@ -395,13 +391,19 @@ int InitializeI2C(int chan, unsigned char gpio) {
 int main(int argc, char *argv[]) {
 	int i, a;
 	char *s;
+	char *readChar = (char*)malloc(16);
 	int b = 0;
-	int addr;
+	unsigned char readBytes = 1;
+	int addr = 0;
+	char isAddr = 0;
+	int addr_read;
+	int addr_write;
+	int addr_send; // CMD oder EEPROM-Addr
 
 	if(argc < 2) {
-		printf("i2cget: get data from i2c bus using ftdi F4232H I2C\n");
+		printf("i2cget: get data from i2c bus using ftdi FT4232H/FT2232H I2C\n");
 		printf("Written by: Ori Idan Helicon technologies ltd. (ori@helicontech.co.il)\n\n");
-		printf("usage: i2cget [-c <chan>] [-g <gpio state>] <adress> <data>\n");
+		printf("usage: i2cget [-c <chan>] [-g <gpio state>] [-n <readBytes>] <adress> [<EEPROM/CMD>]\n");
 		return 1;
 	}
 	for(a = 1; a < argc; a++) {
@@ -413,38 +415,49 @@ int main(int argc, char *argv[]) {
 				chan = atoi(argv[a]);
 			else if(*s == 'g')
 				gpio = atoi(argv[a]);
+			else if(*s == 'n')
+				readBytes = atoi(argv[a]);
 			else {
 				printf("Unknown option -%c\n", *s);
 				exit;
 			}
-		}
-		else
+		} else if(isxdigit(*s)) {
+			b = 0;
+			if (*s == '0')
+				s++;
+			if (*s == 'x')
+				s++;
+			while (*s) {
+				if (!isxdigit(*s)) {
+					printf("%c Invalid hex value: %s\n", *s, argv[i]);
+					break;
+				}
+				b *= 16;
+				*s = toupper(*s);
+				if (*s >= 'A')
+					b += (*s - 'A' + 10);
+				else
+					b += (*s - '0');
+				s++;
+			}
+			if(!addr)
+				addr = b;
+			else {
+				addr_send = b;
+				isAddr = 1;
+			}
+		} else
 			break;
 	}
+
+	if(debug)
+		printf("Input Addr: I2C 0x%02X CMD 0x%02X\n", addr, addr_send);
+
 	InitializeI2C(chan, gpio);
 
-	s = argv[1];
-	b = 0;
-	if(*s == '0')
-		s++;
-	if(*s == 'x')
-		s++;
-	while(*s) {	
-		if(!isxdigit(*s)) {
-			printf("%c Invalid hex value: %s\n", *s, argv[i]);
-			break;
-		}
-		b *= 16;
-		*s = toupper(*s);
-		if(*s >= 'A')
-			b += (*s - 'A' + 10);
-		else
-			b += (*s - '0');
-		s++;
-	}
-	b = b << 1;	/* R/W bit should be 1 */
-	b |= 0x01;
-	addr = b;
+	addr_write = addr << 1;	/* R/W bit should be 0 for write */
+	addr_read = addr_write | 0x01; /* set read bit */
+
 	if(argv[2] != NULL) {
 		i = atoi(argv[2]);
 		if(i <= 0)
@@ -452,27 +465,51 @@ int main(int argc, char *argv[]) {
 	}
 	else
 		i = 1;
-	for( ; i > 0; i--) {
+
+	// Write CMD / EEPROM-Addr to I2C
+	if (isAddr) {
 		HighSpeedSetI2CStart();
-		if(debug)
-			printf("Sending %02X\n", addr);
-		b = SendByteAndCheckACK((unsigned char)addr);
-		if(debug) {
-			if(b)
+		if (debug)
+			printf("Sending Addr 0x%02X\n", addr_write);
+		b = SendByteAndCheckACK((unsigned char) addr_write);
+		if (debug) {
+			if (b)
 				printf("Received ACK\n");
 			else
 				printf("Error reading ACK\n");
 		}
-		b = ReadByte();
-		printf("0x%02X ", b);
-		HighSpeedSetI2CStop();
-		ftdi_write_data(&ftdic, OutputBuffer, dwNumBytesToSend);
-		dwNumBytesToSend = 0;
+		printf("Sending CMD 0x%02X\n", addr_send);
+		b = SendByteAndCheckACK((unsigned char) addr_send);
+		if (debug) {
+			if (b)
+				printf("Received ACK\n");
+			else
+				printf("Error reading ACK\n");
+		}
 	}
 
+	// READ value
+	HighSpeedSetI2CStart();
+	if(debug)
+		printf("Sending Addr 0x%02X\n", addr_read);
+	b = SendByteAndCheckACK((unsigned char)addr_read);
+	if(debug) {
+		if(b)
+			printf("Received ACK\n");
+		else
+			printf("Error reading ACK\n");
+	}
+	ReadBytes(readChar, readBytes);
+	for(i=0;i<readBytes;i++)
+		printf("0x%02X\n", readChar[i]);
+
+	HighSpeedSetI2CStop();
+	ftdi_write_data(&ftdic, OutputBuffer, dwNumBytesToSend);
+	dwNumBytesToSend = 0;
+
 	ftdi_usb_close(&ftdic);
-    ftdi_deinit(&ftdic);
-    printf("\n");
+	ftdi_deinit(&ftdic);
+	printf("\n");
 	return 0;
 }
 
