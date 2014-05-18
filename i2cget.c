@@ -1,5 +1,5 @@
 /*
- | I2C get using libftdi and FT4232 chip connected to USB.
+ | I2C get using libftdi and FT2232/FT4232 chip connected to USB.
  | Note that this utility will open the first FT4232 chip found.
  |
  | Written by Ori Idan, Helicon technologies LTD. (ori@helicontech.co.il)
@@ -24,6 +24,8 @@
 /*
  | Globals and constants
  */
+const unsigned short FTDI_DEV_ADDR = 0x6010; // FT4232=0x6011,FT2232=0x6010
+
 const unsigned char MSB_FALLING_EDGE_CLOCK_BYTE_IN = '\x24';
 const unsigned char MSB_FALLING_EDGE_CLOCK_BYTE_OUT = '\x11';
 const unsigned char MSB_RISING_EDGE_CLOCK_BIT_IN = '\x22';
@@ -200,6 +202,7 @@ unsigned char ReadByte(void) {
  | Read I2C bytes.
  | Note that read address must be sent beforehand
  */
+/*
 void ReadBytes(char * readBuffer, unsigned int readLength) {
     unsigned int clock = 60 * 1000/(1+dwClockDivisor)/2; // K Hz
     const int loopCount = (int)(10 * ((float)200/clock));
@@ -296,6 +299,7 @@ void ReadBytes(char * readBuffer, unsigned int readLength) {
 		
     return;
 }
+*/
 
 /*
  | Open FT4232 device and get valid handle for subsequent access.
@@ -313,7 +317,7 @@ int InitializeI2C(int chan, unsigned char gpio) {
 		printf("ftdi init failed\n");
 		return 0;
 	}
-	ftStatus = ftdi_usb_open(&ftdic, 0x0403, 0x6011);
+	ftStatus = ftdi_usb_open(&ftdic, 0x0403, FTDI_DEV_ADDR);
 	if(ftStatus < 0) {
 		printf("Error opening usb device: %s\n", ftdi_get_error_string(&ftdic));
 		return 1;
