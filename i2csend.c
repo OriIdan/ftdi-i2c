@@ -264,7 +264,7 @@ int main(int argc, char *argv[]) {
 	int b = 0;
 
 	if(argc < 2) {
-		printf("i2csend: Send data over i2c bus using ftdi F4232H port 0 I2C\n");
+		printf("i2csend: Send data over i2c bus using ftdi FT4232H/FT2232H port 0 I2C\n");
 		printf("Written by: Ori Idan Helicon technologies ltd. (ori@helicontech.co.il)\n\n");
 		printf("usage: i2c [-c <chan>] [-g <gpio state>] <adress> <data>\n");
 		return 1;
