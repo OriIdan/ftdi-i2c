@@ -24,6 +24,8 @@
 /*
  | Globals and constants
  */
+const unsigned short FTDI_DEV_ADDR = 0x6010; // FT4232=0x6011,FT2232=0x6010
+
 const unsigned char MSB_FALLING_EDGE_CLOCK_BYTE_IN = '\x24';
 const unsigned char MSB_FALLING_EDGE_CLOCK_BYTE_OUT = '\x11';
 const unsigned char MSB_RISING_EDGE_CLOCK_BIT_IN = '\x22';
@@ -180,7 +182,7 @@ int InitializeI2C(int chan, unsigned char gpio) {
 	i = (chan == 0) ? INTERFACE_A : INTERFACE_B;
 	ftdi_set_interface(&ftdic, i);
 	
-	ftStatus = ftdi_usb_open(&ftdic, 0x0403, 0x6011);
+	ftStatus = ftdi_usb_open(&ftdic, 0x0403, FTDI_DEV_ADDR);
 	if(ftStatus < 0) {
 		printf("Error opening usb device: %s\n", ftdi_get_error_string(&ftdic));
 		return 1;
@@ -262,7 +264,7 @@ int main(int argc, char *argv[]) {
 	int b = 0;
 
 	if(argc < 2) {
-		printf("i2csend: Send data over i2c bus using ftdi F4232H port 0 I2C\n");
+		printf("i2csend: Send data over i2c bus using ftdi FT4232H/FT2232H port 0 I2C\n");
 		printf("Written by: Ori Idan Helicon technologies ltd. (ori@helicontech.co.il)\n\n");
 		printf("usage: i2c [-c <chan>] [-g <gpio state>] <adress> <data>\n");
 		return 1;
