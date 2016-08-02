@@ -240,8 +240,7 @@ void ReadBytes(char * readBuffer, unsigned int readLength) {
             OutputBuffer[dwNumBytesToSend++] = '\x02';  // SDA High, SCL Low
             OutputBuffer[dwNumBytesToSend++] = '\x13';
         }
-        ftStatus = FT_Write(ftHandle, 
-        OutputBuffer, dwNumBytesToSend, &dwNumBytesToSend);
+        ftdi_write_data(&ftdic, OutputBuffer, dwNumBytesToSend);
         dwNumBytesToSend = 0;
         ++readCount;
     }
@@ -276,16 +275,15 @@ void ReadBytes(char * readBuffer, unsigned int readLength) {
         OutputBuffer[dwNumBytesToSend++] = '\x02'; // SDA High, SCL Low
         OutputBuffer[dwNumBytesToSend++] = '\x13';
     }
-    ftStatus = FT_Write(ftHandle, 
-        OutputBuffer, dwNumBytesToSend, &dwNumBytesToSend);
-        dwNumBytesToSend = 0;
+    ftdi_write_data(&ftdic, OutputBuffer, dwNumBytesToSend);
+    dwNumBytesToSend = 0;
         
     // Read bytes from device receive buffer, first byte is data read, second byte is ACK bit
 	dwNumBytesRead = ftdi_read_data(&ftdic, readBuffer, readLength);
     
     if(dwNumBytesRead != readLength) {
 		printf("Error reading i2c\n");
-		return 0xFF;
+		return;
 	}
     
     if(debug) {
